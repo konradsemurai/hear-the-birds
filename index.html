@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hearing Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .frequency {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .bird-range {
+            text-align: center;
+            color: #2563eb;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        .primary {
+            background: #2563eb;
+            color: white;
+        }
+        .secondary {
+            background: white;
+            color: #2563eb;
+            border: 1px solid #2563eb;
+        }
+        .result {
+            text-align: center;
+            background: #ecfdf5;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions {
+            font-size: 14px;
+            color: #666;
+            margin-top: 24px;
+        }
+        .instructions ol {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 style="text-align: center; margin: 0 0 24px 0;">Hearing Range Test</h1>
+        
+        <div class="frequency">
+            <div id="currentFreq">20000 Hz</div>
+            <div id="birdRange" class="bird-range"></div>
+        </div>
+
+        <div class="controls">
+            <button id="toggleButton" class="primary">Start Test</button>
+            <button id="heardButton" class="secondary" disabled>I Hear It</button>
+        </div>
+
+        <div id="result" class="result" style="display: none;">
+            <p>Highest Frequency Heard:</p>
+            <p style="font-size: 24px; font-weight: bold; color: #059669;"><span id="highestHeard">0</span> Hz</p>
+        </div>
+
+        <button onclick="resetTest()" class="secondary" style="display: block; margin: 20px auto;">
+            Reset Test
+        </button>
+
+        <div class="instructions">
+            <p>Instructions:</p>
+            <ol>
+                <li>Use your device volume controls to set a comfortable level</li>
+                <li>Click "Start Test" to begin</li>
+                <li>When you hear a tone, click "I Hear It" to record your highest frequency</li>
+                <li>The frequency will automatically lower every 5 seconds</li>
+                <li>The test will continue until 20 Hz or stopped</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let audioContext = null;
+        let oscillator = null;
+        let currentFreq = 20000;
+        let isPlaying = false;
+        let highestHeard = null;
+        let progressionTimer = null;
+
+        const toggleButton = document.getElementById('toggleButton');
+        const heardButton = document.getElementById('heardButton');
+        const currentFreqDisplay = document.getElementById('currentFreq');
+        const birdRangeDisplay = document.getElementById('birdRange');
+        const resultDiv = document.getElementById('result');
+        const highestHeardDisplay = document.getElementById('highestHeard');
+
+        function updateBirdRangeText() {
+            if (currentFreq <= 10000 && currentFreq >= 2000) {
+                const text = currentFreq >= 8000 ? 
+                    "🎵 Highest bird sound frequencies (rare)" : 
+                    currentFreq >= 4000 ? 
+                    "🎵 Typical bird song range" : 
+                    "🎵 Lower bird call frequencies";
+                birdRangeDisplay.textContent = text;
+                birdRangeDisplay.style.display = "block";
+            } else {
+                birdRangeDisplay.style.display = "none";
+            }
+        }
+
+        function startTone() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            if (oscillator) {
+                oscillator.stop();
+                oscillator.disconnect();
+            }
+
+            oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = currentFreq;
+            oscillator.connect(audioContext.destination);
+            oscillator.start();
+            isPlaying = true;
+            toggleButton.textContent = 'Stop Test';
+            heardButton.disabled = false;
+
+            progressionTimer = setInterval(() => {
+                const newFreq = currentFreq - 500;
+                if (newFreq >= 20) {
+                    currentFreq = newFreq;
+                    currentFreqDisplay.textContent = currentFreq + ' Hz';
+                    updateBirdRangeText();
+                    oscillator.frequency.setValueAtTime(currentFreq, audioContext.currentTime);
+                } else {
+                    stopTone();
+                }
+            }, 5000);
+        }
+
+        function stopTone() {
+            if (oscillator) {
+                oscillator.stop();
+                oscillator.disconnect();
+                isPlaying = false;
+                toggleButton.textContent = 'Start Test';
+                heardButton.disabled = true;
+            }
+            if (progressionTimer) {
+                clearInterval(progressionTimer);
+            }
+        }
+
+        function heardTone() {
+            if (!highestHeard) {
+                highestHeard = currentFreq;
+                highestHeardDisplay.textContent = highestHeard;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        function resetTest() {
+            stopTone();
+            currentFreq = 20000;
+            currentFreqDisplay.textContent = currentFreq + ' Hz';
+            highestHeard = null;
+            resultDiv.style.display = 'none';
+            updateBirdRangeText();
+        }
+
+        toggleButton.addEventListener('click', () => {
+            if (isPlaying) {
+                stopTone();
+            } else {
+                startTone();
+            }
+        });
+
+        heardButton.addEventListener('click', heardTone);
+        updateBirdRangeText();
+    </script>
+</body>
+</html>
